@@ -257,6 +257,4 @@ calculate_parcellation_centroid <- function(parc) {
 } 
 
 #––– Usage example –––
-make_and_plot("/Users/edwardclarkson/git/qaMRI-clone/testData/ses-A/sub-case1_ses-A_desc-padded_segmentation.nii.gz")
-parc <- readNifti("/Users/edwardclarkson/git/qaMRI-clone/testData/ses-A/sub-case1_ses-A_desc-padded_segmentation.nii.gz")
-calculate_parcellation_centroid(parc) # make_and_plot("/Users/edwardclarkson/git/qaMRI-clone/testData/BIDS4/derivatives/segmentation/sub-control1/ses-2021B/sub-control1_ses-2021B_desc-padded_segmentation.nii.gz")
+# make_and_plot(files[[6]])
