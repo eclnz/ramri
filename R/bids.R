@@ -154,11 +154,39 @@ Bids <- R6::R6Class("Bids",
       }
     },
 
-    #' @description Get standard slices from scans matching a scan pattern
+    #' @description Set oblique center and affine transformation matrix from parcellation images matching a scan
+    #' pattern for each session.
     #' @param scan_pattern Regular expression pattern to match scan names
     #' @param folder_pattern Optional regular expression pattern to match folder names
     #' @return List of Slice objects
-    get_slices = function(scan_pattern, folder_pattern = NULL) {
+    set_oblique = function(scan_pattern, folder_pattern = NULL) {
+      for (subject in self$subjects) {
+        for (session in subject$sessions) {
+          matching_scans <- session$scans[grepl(scan_pattern, sapply(session$scans, function(s) s$scan_name))]
+          if (!is.null(folder_pattern)) {
+            matching_scans <- matching_scans[grepl(folder_pattern, sapply(matching_scans, function(s) s$path))]
+          }
+          if (length(matching_scans) == 0) {
+            next
+          }
+          if (length(matching_scans) > 1) {
+            warning(sprintf("Multiple parcellation images found for scan pattern: %s \nTaking first one", scan_pattern))
+          }
+          parcellation_img <- load_nifti(matching_scans[[1]]$path)
+          oblique_affine <- compute_combined_rotation(parcellation_img)
+          oblique_center <- calculate_parcellation_centroid(parcellation_img)
+          session$set_oblique_affine(oblique_affine)
+          session$set_oblique_center(oblique_center)
+        }
+      }
+    },
+
+    #' @description Get standard slices from scans matching a scan pattern
+    #' @param scan_pattern Regular expression pattern to match scan names
+    #' @param folder_pattern Optional regular expression pattern to match folder names
+    #' @param oblique_slices Logical, whether to extract oblique slices using the oblique affine
+    #' @return List of Slice objects
+    get_slices = function(scan_pattern, folder_pattern = NULL, oblique_slices = FALSE) {
       result_slices <- tibble::tibble()
       for (subject in self$subjects) {
         for (session in subject$sessions) {
@@ -171,7 +199,22 @@ Bids <- R6::R6Class("Bids",
           }
           for (scan in matching_scans) {
             img <- load_nifti(scan$path)
-            extracted_slices <- extract_nonzero_slices(img)
+            if (oblique_slices) {
+              if (is.null(session$oblique_affine) || is.null(session$oblique_center)) {
+                warning(sprintf("Oblique slices requested but no oblique affine or center found for session %s", session$get_name()))
+                extracted_slices <- extract_nonzero_slices(img)
+              }
+              extracted_slices <- extract_oriented_slices(img,
+                                                          affine = session$oblique_affine,
+                                                          center = session$oblique_center)
+            } else {
+              if (is.null(session$oblique_affine) || is.null(session$oblique_center)) {
+                warning(sprintf("Oblique slices requested but no oblique affine or center found for session %s", session$get_name()))
+                extracted_slices <- extract_nonzero_slices(img)
+              } else {
+                extracted_slices <- extract_nonzero_slices(img, center = session$oblique_center)
+              }
+            }
             dataframe <- tibble::tibble(
               subject_id = subject$id,
               session_id = session$id,
@@ -312,6 +355,10 @@ Session <- R6::R6Class("Session",
     id = NULL,
     #' @field scans List containing scan objects for this session.
     scans = list(),
+    #' @field oblique_affine Oblique affine transformation matrix.
+    oblique_affine = NULL,
+    #' @field oblique_center Oblique center of the parcellation.
+    oblique_center = NULL,
 
     #' @description Initializes a session object.
     #' @param session_path Character string path to the session's directory.
@@ -385,7 +432,31 @@ Session <- R6::R6Class("Session",
     #' @description Format the session information for printing.
     #' @return Character string representation (e.g., "Session(id=preop)").
     format = function() {
-      sprintf("Session(id=%s)", self$id)
+      sprintf("Session(id=%s, oblique_affine=%s, oblique_center=%s)", self$id, toString(self$oblique_affine), toString(self$oblique_center))
+    },
+
+    #' @description Get the oblique affine transformation matrix.
+    #' @return Matrix of the oblique affine transformation matrix.
+    get_oblique_affine = function() {
+      self$oblique_affine
+    },
+
+    #' @description Get the oblique center of the parcellation.
+    #' @return Vector of the oblique center of the parcellation.
+    get_oblique_center = function() {
+      self$oblique_center
+    },
+
+    #' @description Set the oblique affine transformation matrix.
+    #' @param affine Matrix of the oblique affine transformation matrix.
+    set_oblique_affine = function(affine) {
+      self$oblique_affine <- affine
+    },
+
+    #' @description Set the oblique center of the parcellation.
+    #' @param center Vector of the oblique center of the parcellation.
+    set_oblique_center = function(center) {
+      self$oblique_center <- center
     }
   )
 )

@@ -15,6 +15,10 @@ Represents a single session for a subject in a BIDS dataset.
 \item{\code{id}}{Identifier for the session (e.g., "preop").}
 
 \item{\code{scans}}{List containing scan objects for this session.}
+
+\item{\code{oblique_affine}}{Oblique affine transformation matrix.}
+
+\item{\code{oblique_center}}{Oblique center of the parcellation.}
 }
 \if{html}{\out{</div>}}
 }
@@ -27,6 +31,10 @@ Represents a single session for a subject in a BIDS dataset.
 \item \href{#method-Session-get_id}{\code{Session$get_id()}}
 \item \href{#method-Session-get_name}{\code{Session$get_name()}}
 \item \href{#method-Session-format}{\code{Session$format()}}
+\item \href{#method-Session-get_oblique_affine}{\code{Session$get_oblique_affine()}}
+\item \href{#method-Session-get_oblique_center}{\code{Session$get_oblique_center()}}
+\item \href{#method-Session-set_oblique_affine}{\code{Session$set_oblique_affine()}}
+\item \href{#method-Session-set_oblique_center}{\code{Session$set_oblique_center()}}
 \item \href{#method-Session-clone}{\code{Session$clone()}}
 }
 }
@@ -137,6 +145,66 @@ Format the session information for printing.
 
 \subsection{Returns}{
 Character string representation (e.g., "Session(id=preop)").
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Session-get_oblique_affine"></a>}}
+\if{latex}{\out{\hypertarget{method-Session-get_oblique_affine}{}}}
+\subsection{Method \code{get_oblique_affine()}}{
+Get the oblique affine transformation matrix.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Session$get_oblique_affine()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Matrix of the oblique affine transformation matrix.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Session-get_oblique_center"></a>}}
+\if{latex}{\out{\hypertarget{method-Session-get_oblique_center}{}}}
+\subsection{Method \code{get_oblique_center()}}{
+Get the oblique center of the parcellation.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Session$get_oblique_center()}\if{html}{\out{</div>}}
+}
+
+\subsection{Returns}{
+Vector of the oblique center of the parcellation.
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Session-set_oblique_affine"></a>}}
+\if{latex}{\out{\hypertarget{method-Session-set_oblique_affine}{}}}
+\subsection{Method \code{set_oblique_affine()}}{
+Set the oblique affine transformation matrix.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Session$set_oblique_affine(affine)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{affine}}{Matrix of the oblique affine transformation matrix.}
+}
+\if{html}{\out{</div>}}
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Session-set_oblique_center"></a>}}
+\if{latex}{\out{\hypertarget{method-Session-set_oblique_center}{}}}
+\subsection{Method \code{set_oblique_center()}}{
+Set the oblique center of the parcellation.
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Session$set_oblique_center(center)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{center}}{Vector of the oblique center of the parcellation.}
+}
+\if{html}{\out{</div>}}
 }
 }
 \if{html}{\out{<hr>}}

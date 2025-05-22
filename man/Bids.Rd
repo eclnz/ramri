@@ -23,6 +23,7 @@ Handles BIDS-formatted directories.
 \itemize{
 \item \href{#method-Bids-new}{\code{Bids$new()}}
 \item \href{#method-Bids-print_tree}{\code{Bids$print_tree()}}
+\item \href{#method-Bids-set_oblique}{\code{Bids$set_oblique()}}
 \item \href{#method-Bids-get_slices}{\code{Bids$get_slices()}}
 \item \href{#method-Bids-clone}{\code{Bids$clone()}}
 }
@@ -78,12 +79,13 @@ scans (default: FALSE).}
 }
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-Bids-get_slices"></a>}}
-\if{latex}{\out{\hypertarget{method-Bids-get_slices}{}}}
-\subsection{Method \code{get_slices()}}{
-Get standard slices from scans matching a scan pattern
+\if{html}{\out{<a id="method-Bids-set_oblique"></a>}}
+\if{latex}{\out{\hypertarget{method-Bids-set_oblique}{}}}
+\subsection{Method \code{set_oblique()}}{
+Set oblique center and affine transformation matrix from parcellation images matching a scan
+pattern for each session.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Bids$get_slices(scan_pattern, folder_pattern = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Bids$set_oblique(scan_pattern, folder_pattern = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -92,6 +94,30 @@ Get standard slices from scans matching a scan pattern
 \item{\code{scan_pattern}}{Regular expression pattern to match scan names}
 
 \item{\code{folder_pattern}}{Optional regular expression pattern to match folder names}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Returns}{
+List of Slice objects
+}
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-Bids-get_slices"></a>}}
+\if{latex}{\out{\hypertarget{method-Bids-get_slices}{}}}
+\subsection{Method \code{get_slices()}}{
+Get standard slices from scans matching a scan pattern
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Bids$get_slices(scan_pattern, folder_pattern = NULL, oblique_slices = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{scan_pattern}}{Regular expression pattern to match scan names}
+
+\item{\code{folder_pattern}}{Optional regular expression pattern to match folder names}
+
+\item{\code{oblique_slices}}{Logical, whether to extract oblique slices using the oblique affine}
 }
 \if{html}{\out{</div>}}
 }
