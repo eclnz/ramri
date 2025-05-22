@@ -8,7 +8,7 @@ read_fs_labels <- function(file_path) {
 }
 
 clean_fs_labels <- function(fs_labels) {
-  if (names(fs_labels) != c("parcel_id", "parcel_label", "R", "G", "B", "A")) {
+  if (!all(names(fs_labels) == c("parcel_id", "parcel_label", "R", "G", "B", "A"))) {
     stop("fs_labels must have 6 columns: parcel_id, parcel_label, R, G, B, A")
   }
   fs_labels %>%
@@ -41,4 +41,20 @@ clean_fs_labels <- function(fs_labels) {
     parcel_label = stringr::str_to_title(parcel_label)
   ) %>%
   tibble::as_tibble()
+}
+
+left_right_parcels <- function(fs_labels, subcortical_included) {
+  subcortical_labels <- fs_labels %>%
+    filter(tissue_type == "Subcortical" & 
+           stringr::str_detect(tolower(region), paste(tolower(subcortical_included), collapse = "|")))
+
+  right_side <- subcortical_labels %>%
+    dplyr::filter(hemisphere == "Right") %>%
+    dplyr::pull(parcel_id)
+
+  left_side <- subcortical_labels %>%
+    dplyr::filter(hemisphere == "Left") %>%
+    dplyr::pull(parcel_id)
+
+  list(right_side = right_side, left_side = left_side)
 }
