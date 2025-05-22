@@ -21,73 +21,51 @@ is_within_parcels <- function(parc, parcels) {
 }
 
 calculate_ellipsoid <- function(voxel_coords) {
-  if (nrow(voxel_coords) < 3) {
-    stop("Too few points to compute ellipsoid.")
-  }
-
-  if (any(!is.finite(voxel_coords))) {
-    stop("Non-finite voxel coordinates detected.")
-  }
-
   cov_matrix <- cov(voxel_coords)
-
-  if (any(!is.finite(cov_matrix))) {
-    stop("Covariance matrix contains NA, Inf, or NaN.")
-  }
-
-  eig <- tryCatch(eigen(cov_matrix), error = function(e) {
-    print("Covariance matrix:")
-    print(cov_matrix)
-    stop("Eigen decomposition failed: ", e$message)
-  })
-
-  V <- eig$vectors
-
+  eig <- eigen(cov_matrix)
+  vector <- eig$vectors
   for (i in 1:3) {
-    dominant_index <- which.max(abs(V[, i]))
-    if (V[dominant_index, i] < 0) {
-      V[, i] <- -V[, i]
+    dominant_index <- which.max(abs(vector[, i]))
+    if (vector[dominant_index, i] < 0) {
+      vector[, i] <- -vector[, i]
     }
   }
-
-  if (det(V) < 0) V[,3] <- -V[,3]
-
+  if (det(vector) < 0) vector[,3] <- -vector[,3]
   list(
-    direction_vectors = V,
+    direction_vectors = vector,
     scaling_factors = sqrt(eig$values),
     cov_matrix = cov_matrix
   )
 }
 
-normalize <- function(v) {
-  norm <- sqrt(sum(v^2))
+norm_vector <- function(vector) {
+  norm <- sqrt(sum(vector^2))
   if (norm < .Machine$double.eps) {
     warning("Attempted to normalize a near-zero vector.")
-    return(rep(NA, length(v)))
+    return(rep(NA, length(vector)))
   }
-  v / norm
+  vector / norm
 }
 
 combine_ellipsoid_orientations <- function(left_center, right_center, left_ellipsoid, right_ellipsoid) {
-  x_axis <- normalize(right_center - left_center)
+  x_axis <- norm_vector(right_center - left_center)
 
   x1 <- left_ellipsoid$direction_vectors[, 1]
   x2 <- right_ellipsoid$direction_vectors[, 1]
-
-  # Align signs
   if (sum(x1 * x2) < 0) x2 <- -x2
-  x_axis <- normalize(x1 + x2)
+  x_axis <- norm_vector(x1 + x2)
 
   y1 <- left_ellipsoid$direction_vectors[, 2]
   y2 <- right_ellipsoid$direction_vectors[, 2]
   if (sum(y1 * y2) < 0) y2 <- -y2
-  y_avg <- normalize(y1 + y2)
+  y_avg <- norm_vector(y1 + y2)
 
   y_axis <- y_avg - sum(y_avg * x_axis) * x_axis
-  y_axis <- normalize(y_axis)
+  y_axis[1] <- 0  # Set X component of Y-axis to zero to eliminate Z-plane rotation
+  y_axis <- norm_vector(y_axis)
 
-  z_axis <- normalize(pracma::cross(x_axis, y_axis))
-  y_axis <- normalize(pracma::cross(z_axis, x_axis))
+  z_axis <- norm_vector(pracma::cross(x_axis, y_axis))
+  y_axis <- norm_vector(pracma::cross(z_axis, x_axis))
 
   rotation_matrix <- cbind(x_axis, y_axis, z_axis)
 
@@ -95,10 +73,14 @@ combine_ellipsoid_orientations <- function(left_center, right_center, left_ellip
     warning("Final rotation matrix is not orthonormal.")
   }
 
-  return(rotation_matrix)
+  rotation_matrix
 }
 
-visualize_rotation_frame <- function(rotation_matrix, origin = c(0, 0, 0), scale = 20, colors = c("red", "green", "blue"), labels = c("X", "Y", "Z")) {
+visualize_rotation_frame <- function(rotation_matrix,
+                                     origin = c(0, 0, 0),
+                                     scale = 20,
+                                     colors = c("red", "green", "blue"),
+                                     labels = c("X", "Y", "Z")) {
   for (i in 1:3) {
     dir_vec <- rotation_matrix[, i]
     end_point <- origin + dir_vec * scale
@@ -155,5 +137,26 @@ main <- function(parc_path, lut_path) {
   title3d(main = "Oriented Subcortical Ellipsoids", xlab = "X", ylab = "Y", zlab = "Z")
 }
 
+compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt") {
+  fs_labels <- read_fs_labels(lut_path)
+  subcortical_labels <- c("thalamus", "caudate", "putamen", "pallidum", "accumbens")
+  parcels <- left_right_parcels(fs_labels, subcortical_labels)
+
+  left_mask <- is_within_parcels(parc, parcels$left_side)
+  right_mask <- is_within_parcels(parc, parcels$right_side)
+
+  left_coords <- which(left_mask, arr.ind = TRUE)
+  right_coords <- which(right_mask, arr.ind = TRUE)
+
+  left_center <- colMeans(left_coords)
+  right_center <- colMeans(right_coords)
+
+  left_ellipsoid <- calculate_ellipsoid(left_coords)
+  right_ellipsoid <- calculate_ellipsoid(right_coords)
+
+  rotation_matrix <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
+
+  return(rotation_matrix)
+}
 # Example usage:
-main(parc_path = files[[6]], lut_path = "FreeSurferColorLUT.txt")
+# main(parc_path = files[[4]], lut_path = "FreeSurferColorLUT.txt")
