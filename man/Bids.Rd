@@ -85,7 +85,7 @@ scans (default: FALSE).}
 Set oblique center and affine transformation matrix from parcellation images matching a scan
 pattern for each session.
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Bids$set_oblique(scan_pattern, folder_pattern = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Bids$set_oblique(scan_pattern, folder_pattern = NULL, verbose = FALSE)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -94,6 +94,8 @@ pattern for each session.
 \item{\code{scan_pattern}}{Regular expression pattern to match scan names}
 
 \item{\code{folder_pattern}}{Optional regular expression pattern to match folder names}
+
+\item{\code{verbose}}{Logical, whether to print debugging information (default: FALSE).}
 }
 \if{html}{\out{</div>}}
 }
@@ -107,7 +109,12 @@ List of Slice objects
 \subsection{Method \code{get_slices()}}{
 Get standard slices from scans matching a scan pattern
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Bids$get_slices(scan_pattern, folder_pattern = NULL, oblique_slices = FALSE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Bids$get_slices(
+  scan_pattern,
+  folder_pattern = NULL,
+  oblique_slices = FALSE,
+  verbose = FALSE
+)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -118,6 +125,8 @@ Get standard slices from scans matching a scan pattern
 \item{\code{folder_pattern}}{Optional regular expression pattern to match folder names}
 
 \item{\code{oblique_slices}}{Logical, whether to extract oblique slices using the oblique affine}
+
+\item{\code{verbose}}{Logical, whether to print debugging information (default: FALSE).}
 }
 \if{html}{\out{</div>}}
 }

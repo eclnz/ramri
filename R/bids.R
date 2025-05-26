@@ -158,10 +158,20 @@ Bids <- R6::R6Class("Bids",
     #' pattern for each session.
     #' @param scan_pattern Regular expression pattern to match scan names
     #' @param folder_pattern Optional regular expression pattern to match folder names
+    #' @param verbose Logical, whether to print debugging information (default: FALSE).
     #' @return List of Slice objects
-    set_oblique = function(scan_pattern, folder_pattern = NULL) {
+    set_oblique = function(scan_pattern, folder_pattern = NULL, verbose = FALSE) {
+      if (verbose) {
+        cat("Starting set_oblique with scan_pattern:", scan_pattern, "\n")
+      }
       for (subject in self$subjects) {
+        if (verbose) {
+          cat("Processing subject:", subject$get_name(), "\n")
+        }
         for (session in subject$sessions) {
+          if (verbose) {
+            cat("Processing session:", session$get_name(), "\n")
+          }
           matching_scans <- session$scans[grepl(scan_pattern, sapply(session$scans, function(s) s$scan_name))]
           if (!is.null(folder_pattern)) {
             matching_scans <- matching_scans[grepl(folder_pattern, sapply(matching_scans, function(s) s$path))]
@@ -172,12 +182,28 @@ Bids <- R6::R6Class("Bids",
           if (length(matching_scans) > 1) {
             warning(sprintf("Multiple parcellation images found for scan pattern: %s \nTaking first one", scan_pattern))
           }
+          if (verbose) {
+            cat("Processing scan:", matching_scans[[1]]$scan_name, "\n")
+          }
           parcellation_img <- load_nifti(matching_scans[[1]]$path)
-          oblique_affine <- compute_combined_rotation(parcellation_img)
-          oblique_center <- calculate_parcellation_centroid(parcellation_img)
+          tryCatch(
+            {
+              oblique_affine <- compute_combined_rotation(parcellation_img)
+              oblique_center <- calculate_parcellation_centroid(parcellation_img)
+            },
+            error = function(e) {
+              warning(sprintf("Error processing scan %s: %s", matching_scans[[1]]$path, e$message))
+            }
+          )
           session$set_oblique_affine(oblique_affine)
           session$set_oblique_center(oblique_center)
+          if (verbose) {
+            cat("Set oblique affine and center for session:", session$get_name(), "\n")
+          }
         }
+      }
+      if (verbose) {
+        cat("Finished set_oblique\n")
       }
     },
 
@@ -185,10 +211,17 @@ Bids <- R6::R6Class("Bids",
     #' @param scan_pattern Regular expression pattern to match scan names
     #' @param folder_pattern Optional regular expression pattern to match folder names
     #' @param oblique_slices Logical, whether to extract oblique slices using the oblique affine
+    #' @param verbose Logical, whether to print debugging information (default: FALSE).
     #' @return List of Slice objects
-    get_slices = function(scan_pattern, folder_pattern = NULL, oblique_slices = FALSE) {
+    get_slices = function(scan_pattern, folder_pattern = NULL, oblique_slices = FALSE, verbose = FALSE) {
+      if (verbose) {
+        cat("Starting get_slices with scan_pattern:", scan_pattern, "\n")
+      }
       result_slices <- tibble::tibble()
       for (subject in self$subjects) {
+        if (verbose) {
+          cat("Processing subject:", subject$get_name(), "\n")
+        }
         for (session in subject$sessions) {
           matching_scans <- session$scans[grepl(scan_pattern, sapply(session$scans, function(s) s$scan_name))]
           if (!is.null(folder_pattern)) {
@@ -199,6 +232,7 @@ Bids <- R6::R6Class("Bids",
           }
           for (scan in matching_scans) {
             img <- load_nifti(scan$path)
+            cat(oblique_slices, "\n")
             if (oblique_slices) {
               if (is.null(session$oblique_affine) || is.null(session$oblique_center)) {
                 warning(sprintf("Oblique slices requested but no oblique affine or center found for session %s", session$get_name()))
@@ -212,6 +246,9 @@ Bids <- R6::R6Class("Bids",
                 warning(sprintf("Oblique slices requested but no oblique affine or center found for session %s", session$get_name()))
                 extracted_slices <- extract_nonzero_slices(img)
               } else {
+                if (verbose) {
+                  cat("Extracting slices with oblique center for session:", session$get_name(), "\n")
+                }
                 extracted_slices <- extract_nonzero_slices(img, center = session$oblique_center)
               }
             }
@@ -232,7 +269,14 @@ Bids <- R6::R6Class("Bids",
       }
 
       if (nrow(result_slices) == 0) {
+        if (verbose) {
+          cat("No slices could be extracted for scans matching scan pattern:", scan_pattern, "\n")
+        }
         stop(sprintf("No slices could be extracted for scans matching scan pattern: %s", scan_pattern))
+      }
+
+      if (verbose) {
+        cat("Finished get_slices\n")
       }
 
       result_slices

@@ -1,16 +1,17 @@
 library(devtools)
 load_all()
 library(tidyverse)
-library(concaveman)
-library(sf)
 library(RColorBrewer)
 library(ggpubr)
 library(ggsci)
 library(patchwork)
 library(rstatix)
-library(ggrepel)
-library(forcats)
-library(gridExtra)
+# library(ggrepel)
+library(forcats) # included already
+# library(gridExtra)
+
+
+x <- c(10,20,30)
 
 BIDS_DIR = "/Users/edwardclarkson/Downloads/motion_slices"
 

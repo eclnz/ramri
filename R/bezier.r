@@ -1,12 +1,5 @@
 # Updated R script: nearest‐neighbor ordering + natural spline through all anchors
 
-#––– dependencies –––
-for (pkg in c("RNifti","rgl","misc3d","geometry")) if (!requireNamespace(pkg, quietly=TRUE)) install.packages(pkg)
-library(RNifti)
-library(rgl)
-library(misc3d)
-library(geometry)
-
 #––– helper: find extreme point for a given label –––
 get_extreme_point <- function(img, label,
                               ext_axes, ext_dirs,
@@ -49,17 +42,14 @@ reorder_indices <- function(pts) {
 }
 #––– optimized closed spline curve (minimizing distance between neighbors) –––
 make_spline_curve <- function(pts, n = 200) {
-  library(splines)
-  library(stats)
-  
   # Ensure closed curve: no start/end discontinuity
   # Find optimal reordering via traveling salesman-like greedy strategy
   n_pts <- nrow(pts)
   dist_matrix <- as.matrix(dist(pts))
-  
+
   best_order <- NULL
   best_total <- Inf
-  
+
   for (start in 1:n_pts) {
     visited <- rep(FALSE, n_pts)
     order <- integer(n_pts)
@@ -77,61 +67,23 @@ make_spline_curve <- function(pts, n = 200) {
     }
     # Add distance to close the loop
     total <- total + dist_matrix[order[n_pts], order[1]]
-    
+
     if (total < best_total) {
       best_total <- total
       best_order <- order
     }
   }
-  
+
   pts_ordered <- pts[best_order, , drop = FALSE]
   pts_closed <- rbind(pts_ordered, pts_ordered[1, ])
   t_vals <- seq(0, 1, length.out = nrow(pts_closed))
-  
+
   fx <- splinefun(t_vals, pts_closed[, 1], method = "fmm")
   fy <- splinefun(t_vals, pts_closed[, 2], method = "fmm")
   fz <- splinefun(t_vals, pts_closed[, 3], method = "fmm")
   
   t_sample <- seq(0, 1, length.out = n)
   cbind(fx(t_sample), fy(t_sample), fz(t_sample))
-}
-
-#––– Fit a single ellipsoid to 3D points by minimizing surface residuals –––
-fit_ellipsoid <- function(pts) {
-  if (ncol(pts) != 3) stop("Input must be an Nx3 matrix of 3D points.")
-  
-  x <- pts[, 1]
-  y <- pts[, 2]
-  z <- pts[, 3]
-  
-  # Design matrix for general quadric surface
-  D <- cbind(
-    x^2, y^2, z^2,
-    2*x*y, 2*x*z, 2*y*z,
-    2*x, 2*y, 2*z,
-    1
-  )
-  
-  # Solve least squares: D %*% coef ≈ 0
-  S <- svd(D)
-  coef <- S$v[, ncol(S$v)]
-  
-  # Build algebraic form: Ax^2 + By^2 + Cz^2 + Dxy + Exz + Fyz + Gx + Hy + Iz + J = 0
-  names(coef) <- c("A", "B", "C", "D", "E", "F", "G", "H", "I", "J")
-  
-  # Return coefficients + function to evaluate residuals
-  ellipsoid_fun <- function(x, y, z) {
-    with(as.list(coef), {
-      A*x^2 + B*y^2 + C*z^2 + D*x*y + E*x*z + F*y*z +
-        G*x + H*y + I*z + J
-    })
-  }
-  
-  list(
-    coefficients = coef,
-    residuals = ellipsoid_fun(x, y, z),
-    evaluate = ellipsoid_fun
-  )
 }
 
 #––– label specifications –––
@@ -164,7 +116,7 @@ compute_enclosed_centroid <- function(curve1, curve2) {
 make_and_plot <- function(parc_path, n = 300) {
   # load parcellation
   parc <- readNifti(parc_path)
-
+  parc <- round(parc)
   # extract raw anchor points + labels
   V_raw <- t(sapply(vertical_specs,   function(s)
     get_extreme_point(parc, s$label, s$ext_axes, s$ext_dirs, s$weight_axis)
@@ -238,23 +190,24 @@ calculate_parcellation_centroid <- function(parc) {
   H_raw <- t(sapply(horizontal_specs, function(s)
     get_extreme_point(parc, s$label, s$ext_axes, s$ext_dirs, s$weight_axis)
   ))
-  
+
   # Reorder points by nearest-neighbor path
   ordV <- reorder_indices(V_raw)
   ordH <- reorder_indices(H_raw)
   V <- V_raw[ordV, , drop = FALSE]
   H <- H_raw[ordH, , drop = FALSE]
-  
+
   # Create spline curves from the points
   curveV <- make_spline_curve(V)
   curveH <- make_spline_curve(H)
-  
+
   # Compute the centroid between the two curves
   central_point <- compute_enclosed_centroid(curveV, curveH)
-  
+
   # Return the x, y, z coordinates of the centroid
   return(round(central_point))
-} 
+}
 
-#––– Usage example –––
-# make_and_plot(files[[6]])
+# #––– Usage example –––
+# file = "/eresearch/qamri-mtbi/ecla535/BIDS_holly_motion/compressed/derivatives/segmentation/sub-expANONYMIZED/ses-2024ANON4295Se10_2/sub-expANONYMIZED_ses-2024ANON4295Se10_2_desc-padded_segmentation.nii.gz"
+# make_and_plot(file)
