@@ -116,8 +116,6 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   subcortical_labels <- c("thalamus", "caudate", "putamen", "pallidum", "accumbens")
   parcels <- left_right_parcels(fs_labels, subcortical_labels)
 
-  affine <- RNifti::xform(parc)
-
   left_mask <- is_within_parcels(parc, parcels$left_side)
   right_mask <- is_within_parcels(parc, parcels$right_side)
 
@@ -133,56 +131,21 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   left_ellipsoid <- calculate_ellipsoid(left_coords)
   right_ellipsoid <- calculate_ellipsoid(right_coords)
 
-  rot <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
+  rotation_matrix <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
+  
+  # Adjust for image orientation
+  if (grepl("L", img_orientation)) {
+    # Flip X-axis for left-posterior-anterior orientations
+    rotation_matrix[,1] <- -rotation_matrix[,1]
+    # Re-orthogonalize the rotation matrix
+    rotation_matrix <- qr.Q(qr(rotation_matrix))
+  }
 
-  x_axis <- rot[, 1]
-  y_axis <- rot[, 2]
-  z_axis <- rot[, 3]
-
-  # Enforce RAS orientation convention:
-  # X: Right (positive X), Y: Anterior (positive Y), Z: Superior (positive Z)
-  if (x_axis[1] < 0) x_axis <- -x_axis
-  if (y_axis[2] < 0) y_axis <- -y_axis
-  if (z_axis[3] < 0) z_axis <- -z_axis
-
-  # Re-orthonormalize
-  y_axis <- norm_vector(pracma::cross(z_axis, x_axis))
-  z_axis <- norm_vector(pracma::cross(x_axis, y_axis))
-
-  rotation_matrix <- cbind(x_axis, y_axis, z_axis)
-  visualize_ellipsoids_and_frame(left_coords, right_coords, left_ellipsoid, right_ellipsoid, rotation_matrix)
-
-  rotation_matrix
+  return(rotation_matrix)
 }
+# # Example usage:
+# path = "/eresearch/qamri-mtbi/ecla535/BIDS_holly_motion/derivatives/segmentation/sub-expANONYMIZED/ses-2024ANON4295Se10_2/sub-expANONYMIZED_ses-2024ANON4295Se10_2_desc-padded_segmentation.nii.gz"
+# parc = readNifti(path)
+orientation(parc)
+# main(parc_path = path, lut_path = "FreeSurferColorLUT.txt")
 
-main <- function(parc_path, lut_path) {
-  parc <- readNifti(parc_path)
-  rot <- compute_combined_rotation(parc, lut_path)
-  print("Combined rotation matrix (RAS enforced):")
-  print(rot)
-}
-
-# # Load dependencies
-# library(RNifti)
-# library(rgl)
-# library(misc3d)
-# library(Rvcg)
-# library(geometry)
-# library(dplyr)
-# library(stringr)
-# library(pracma)
-
-# Usage
-# Create a 2x1 subplot layout
-# par(mfrow = c(2, 1))
-
-# # # First subject
-# path1 = "sub-expANONYMIZED_ses-2024ANON4295Se4_desc-padded_segmentation.nii.gz"
-# main(parc_path = path1, lut_path = "FreeSurferColorLUT.txt")
-
-# # # Second subject
-# path2 = '/Users/edwardclarkson/git/qaMRI-clone/testData/BIDS4/derivatives/segmentation/sub-control1/ses-2021B/sub-control1_ses-2021B_desc-padded_segmentation.nii.gz'
-# main(parc_path = path2, lut_path = "FreeSurferColorLUT.txt")
-
-# # Reset plot layout
-# par(mfrow = c(1, 1))

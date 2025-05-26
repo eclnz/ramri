@@ -19,12 +19,8 @@ Imports:
     purrr,
     R6,
     RColorBrewer,
-    Rcpp,
     reshape2,
-    rgl,
     rlang,
     RNifti,
     tibble,
     tidyr
-LinkingTo: 
-    Rcpp
