@@ -115,16 +115,9 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   fs_labels <- read_fs_labels(lut_path)
   subcortical_labels <- c("thalamus", "caudate", "putamen", "pallidum", "accumbens")
   parcels <- left_right_parcels(fs_labels, subcortical_labels)
-<<<<<<< HEAD
-  
-  # Get NIfTI orientation information
-  img_orientation <- RNifti::orientation(parc)
-  
-=======
 
   affine <- RNifti::xform(parc)
 
->>>>>>> refs/remotes/origin/main
   left_mask <- is_within_parcels(parc, parcels$left_side)
   right_mask <- is_within_parcels(parc, parcels$right_side)
 
@@ -145,19 +138,7 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   left_ellipsoid <- calculate_ellipsoid(left_coords)
   right_ellipsoid <- calculate_ellipsoid(right_coords)
 
-<<<<<<< HEAD
-  rotation_matrix <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
-  
-  # Adjust for image orientation
-  if (grepl("L", img_orientation)) {
-    # Flip X-axis for left-posterior-anterior orientations
-    rotation_matrix[,1] <- -rotation_matrix[,1]
-    # Re-orthogonalize the rotation matrix
-    rotation_matrix <- qr.Q(qr(rotation_matrix))
-  }
-=======
   rot <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
->>>>>>> refs/remotes/origin/main
 
   x_axis <- rot[, 1]
   y_axis <- rot[, 2]
@@ -178,14 +159,6 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
 
   rotation_matrix
 }
-<<<<<<< HEAD
-# # Example usage:
-# path = "/eresearch/qamri-mtbi/ecla535/BIDS_holly_motion/derivatives/segmentation/sub-expANONYMIZED/ses-2024ANON4295Se10_2/sub-expANONYMIZED_ses-2024ANON4295Se10_2_desc-padded_segmentation.nii.gz"
-# parc = readNifti(path)
-orientation(parc)
-# main(parc_path = path, lut_path = "FreeSurferColorLUT.txt")
-
-=======
 
 main <- function(parc_path, lut_path) {
   parc <- readNifti(parc_path)
@@ -218,4 +191,3 @@ main <- function(parc_path, lut_path) {
 
 # # Reset plot layout
 # par(mfrow = c(1, 1))
->>>>>>> refs/remotes/origin/main
