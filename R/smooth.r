@@ -155,7 +155,7 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   z_axis <- norm_vector(pracma::cross(x_axis, y_axis))
 
   rotation_matrix <- cbind(x_axis, y_axis, z_axis)
-  visualize_ellipsoids_and_frame(left_coords, right_coords, left_ellipsoid, right_ellipsoid, rotation_matrix)
+  # visualize_ellipsoids_and_frame(left_coords, right_coords, left_ellipsoid, right_ellipsoid, rotation_matrix)
 
   rotation_matrix
 }
