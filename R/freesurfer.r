@@ -45,8 +45,7 @@ clean_fs_labels <- function(fs_labels) {
 
 left_right_parcels <- function(fs_labels, subcortical_included) {
   subcortical_labels <- fs_labels %>%
-    dplyr::filter(tissue_type == "Subcortical" & 
-           stringr::str_detect(tolower(region), paste(tolower(subcortical_included), collapse = "|")))
+    dplyr::filter(tissue_type == "Subcortical" & stringr::str_detect(tolower(region), paste(tolower(subcortical_included), collapse = "|")))
 
   right_side <- subcortical_labels %>%
     dplyr::filter(hemisphere == "Right") %>%
