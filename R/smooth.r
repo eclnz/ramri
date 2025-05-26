@@ -1,16 +1,5 @@
 # slice.R
 
-# Load necessary libraries
-library(RNifti)
-library(rgl)
-library(misc3d)
-library(Rvcg)
-library(geometry)
-library(dplyr)
-library(stringr)
-library(pracma)
-library(devtools)
-
 # Check if voxels are within specified parcels
 is_within_parcels <- function(parc, parcels) {
   result <- array(FALSE, dim = dim(parc))
@@ -20,67 +9,97 @@ is_within_parcels <- function(parc, parcels) {
   result
 }
 
-calculate_ellipsoid <- function(voxel_coords) {
-  cov_matrix <- cov(voxel_coords)
+calculate_ellipsoid <- function(coords) {
+  cov_matrix <- cov(coords)
   eig <- eigen(cov_matrix)
-  vector <- eig$vectors
+  vectors <- eig$vectors
   for (i in 1:3) {
-    dominant_index <- which.max(abs(vector[, i]))
-    if (vector[dominant_index, i] < 0) {
-      vector[, i] <- -vector[, i]
+    dominant_index <- which.max(abs(vectors[, i]))
+    if (vectors[dominant_index, i] < 0) {
+      vectors[, i] <- -vectors[, i]
     }
   }
-  if (det(vector) < 0) vector[,3] <- -vector[,3]
+  if (det(vectors) < 0) vectors[,3] <- -vectors[,3]
   list(
-    direction_vectors = vector,
+    direction_vectors = vectors,
     scaling_factors = sqrt(eig$values),
     cov_matrix = cov_matrix
   )
 }
 
-norm_vector <- function(vector) {
-  norm <- sqrt(sum(vector^2))
-  if (norm < .Machine$double.eps) {
-    warning("Attempted to normalize a near-zero vector.")
-    return(rep(NA, length(vector)))
-  }
-  vector / norm
+norm_vector <- function(v) {
+  norm <- sqrt(sum(v^2))
+  if (norm < .Machine$double.eps) return(rep(NA, length(v)))
+  v / norm
 }
 
 combine_ellipsoid_orientations <- function(left_center, right_center, left_ellipsoid, right_ellipsoid) {
-  x_axis <- norm_vector(right_center - left_center)
-
+  # X axis: average of first principal directions (side-to-side)
   x1 <- left_ellipsoid$direction_vectors[, 1]
   x2 <- right_ellipsoid$direction_vectors[, 1]
   if (sum(x1 * x2) < 0) x2 <- -x2
   x_axis <- norm_vector(x1 + x2)
 
+  # Y axis: average of second principal directions (forward-backward)
   y1 <- left_ellipsoid$direction_vectors[, 2]
   y2 <- right_ellipsoid$direction_vectors[, 2]
   if (sum(y1 * y2) < 0) y2 <- -y2
   y_avg <- norm_vector(y1 + y2)
+  y_axis <- norm_vector(y_avg - sum(y_avg * x_axis) * x_axis)
 
-  y_axis <- y_avg - sum(y_avg * x_axis) * x_axis
-  y_axis[1] <- 0  # Set X component of Y-axis to zero to eliminate Z-plane rotation
-  y_axis <- norm_vector(y_axis)
-
+  # Z axis: superior-inferior
   z_axis <- norm_vector(pracma::cross(x_axis, y_axis))
   y_axis <- norm_vector(pracma::cross(z_axis, x_axis))
 
   rotation_matrix <- cbind(x_axis, y_axis, z_axis)
+  if (abs(det(rotation_matrix) - 1) > 1e-3) warning("Rotation matrix is not orthonormal.")
 
-  if (abs(det(rotation_matrix) - 1) > 1e-3) {
-    warning("Final rotation matrix is not orthonormal.")
+  # Ensure Z (superior) points up and Y (anterior) points forward
+  if (rotation_matrix[3, 3] < 0) rotation_matrix[, 3] <- -rotation_matrix[, 3]
+  if (rotation_matrix[2, 2] < 0) rotation_matrix[, 2] <- -rotation_matrix[, 2]
+
+  axes <- list(x_axis, y_axis, z_axis)
+  axis_scores <- t(sapply(axes, function(a) abs(a)))
+
+  best_x <- which.max(axis_scores[, 1])
+  best_y <- which.max(axis_scores[, 2])
+  best_z <- which.max(axis_scores[, 3])
+
+  if (length(unique(c(best_x, best_y, best_z))) < 3) {
+    warning("Ambiguous axis alignment; unable to assign unique canonical axes.")
   }
 
-  rotation_matrix
+  canonical_axes <- list(
+    x_axis = axes[[best_x]],
+    y_axis = axes[[best_y]],
+    z_axis = axes[[best_z]]
+  )
+
+  x_axis <- canonical_axes$x_axis
+  y_axis <- canonical_axes$y_axis
+  z_axis <- canonical_axes$z_axis
+
+  cbind(x_axis, y_axis, z_axis)
 }
 
-visualize_rotation_frame <- function(rotation_matrix,
-                                     origin = c(0, 0, 0),
-                                     scale = 20,
-                                     colors = c("red", "green", "blue"),
-                                     labels = c("X", "Y", "Z")) {
+get_ras_coords <- function(voxel_coords, affine) {
+  coords_homogeneous <- cbind(voxel_coords, 1)
+  ras_coords <- t(apply(coords_homogeneous, 1, function(v) affine %*% v))[, 1:3]
+  ras_coords
+}
+
+visualize_ellipsoids_and_frame <- function(left_coords, right_coords, left_ellipsoid, right_ellipsoid, rotation_matrix) {
+  open3d()
+
+  left_center <- colMeans(left_coords)
+  right_center <- colMeans(right_coords)
+  wire3d(ellipse3d(left_ellipsoid$cov_matrix, centre = left_center, level = 0.8), col = "lightgreen", alpha = 0.4)
+  wire3d(ellipse3d(right_ellipsoid$cov_matrix, centre = right_center, level = 0.8), col = "lightblue", alpha = 0.4)
+
+  origin <- (left_center + right_center) / 2
+  scale <- 30
+  colors <- c("red", "green", "blue")
+  labels <- c("X", "Y", "Z")
   for (i in 1:3) {
     dir_vec <- rotation_matrix[, i]
     end_point <- origin + dir_vec * scale
@@ -89,52 +108,7 @@ visualize_rotation_frame <- function(rotation_matrix,
   }
   axes3d()
   box3d()
-}
-
-plot_parcel <- function(parcel_voxels, label, color) {
-  if (!any(parcel_voxels)) return()
-  voxel_coords <- which(parcel_voxels, arr.ind = TRUE)
-  if (nrow(voxel_coords) < 3) return()
-
-  hull <- convhulln(voxel_coords)
-  mesh <- tmesh3d(vertices = t(voxel_coords), indices = t(hull), homogeneous = FALSE)
-  smooth_mesh <- vcgSmooth(mesh, lambda = 0.5)
-  shade3d(smooth_mesh, color = color, alpha = 0.2)
-
-  ellipsoid <- calculate_ellipsoid(voxel_coords)
-  principal_direction_1 <- ellipsoid$direction_vectors[, 1]
-  center <- colMeans(voxel_coords)
-
-  wire3d(ellipse3d(ellipsoid$cov_matrix, centre = center, level = 0.80), col = color, alpha = 0.5)
-  arrow3d(center, center + principal_direction_1 * ellipsoid$scaling_factors[1], col = "red", type = "lines", lwd = 2)
-}
-
-main <- function(parc_path, lut_path) {
-  parc <- readNifti(parc_path)
-  fs_labels <- read_fs_labels(lut_path)
-  subcortical_labels <- c("thalamus", "caudate", "putamen", "pallidum", "accumbens")
-  parcels <- left_right_parcels(fs_labels, subcortical_labels)
-
-  left_mask <- is_within_parcels(parc, parcels$left_side)
-  right_mask <- is_within_parcels(parc, parcels$right_side)
-
-  left_coords <- which(left_mask, arr.ind = TRUE)
-  right_coords <- which(right_mask, arr.ind = TRUE)
-
-  left_center <- colMeans(left_coords)
-  right_center <- colMeans(right_coords)
-
-  left_ellipsoid <- calculate_ellipsoid(left_coords)
-  right_ellipsoid <- calculate_ellipsoid(right_coords)
-
-  rotation_matrix <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
-
-  open3d()
-  plot_parcel(left_mask, "Left Subcortical", "lightgreen")
-  plot_parcel(right_mask, "Right Subcortical", "lightblue")
-  visualize_rotation_frame(rotation_matrix, origin = (left_center + right_center) / 2, scale = 30)
-
-  title3d(main = "Oriented Subcortical Ellipsoids", xlab = "X", ylab = "Y", zlab = "Z")
+  title3d(main = "Oriented Ellipsoids and Rotation Matrix", xlab = "X", ylab = "Y", zlab = "Z")
 }
 
 compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt") {
@@ -142,11 +116,16 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   subcortical_labels <- c("thalamus", "caudate", "putamen", "pallidum", "accumbens")
   parcels <- left_right_parcels(fs_labels, subcortical_labels)
 
+  affine <- RNifti::xform(parc)
+
   left_mask <- is_within_parcels(parc, parcels$left_side)
   right_mask <- is_within_parcels(parc, parcels$right_side)
 
-  left_coords <- which(left_mask, arr.ind = TRUE)
-  right_coords <- which(right_mask, arr.ind = TRUE)
+  left_coords_vox <- which(left_mask, arr.ind = TRUE)
+  right_coords_vox <- which(right_mask, arr.ind = TRUE)
+
+  left_coords <- get_ras_coords(left_coords_vox, affine)
+  right_coords <- get_ras_coords(right_coords_vox, affine)
 
   left_center <- colMeans(left_coords)
   right_center <- colMeans(right_coords)
@@ -154,9 +133,56 @@ compute_combined_rotation <- function(parc, lut_path = "FreeSurferColorLUT.txt")
   left_ellipsoid <- calculate_ellipsoid(left_coords)
   right_ellipsoid <- calculate_ellipsoid(right_coords)
 
-  rotation_matrix <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
+  rot <- combine_ellipsoid_orientations(left_center, right_center, left_ellipsoid, right_ellipsoid)
 
-  return(rotation_matrix)
+  x_axis <- rot[, 1]
+  y_axis <- rot[, 2]
+  z_axis <- rot[, 3]
+
+  # Enforce RAS orientation convention:
+  # X: Right (positive X), Y: Anterior (positive Y), Z: Superior (positive Z)
+  if (x_axis[1] < 0) x_axis <- -x_axis
+  if (y_axis[2] < 0) y_axis <- -y_axis
+  if (z_axis[3] < 0) z_axis <- -z_axis
+
+  # Re-orthonormalize
+  y_axis <- norm_vector(pracma::cross(z_axis, x_axis))
+  z_axis <- norm_vector(pracma::cross(x_axis, y_axis))
+
+  rotation_matrix <- cbind(x_axis, y_axis, z_axis)
+  visualize_ellipsoids_and_frame(left_coords, right_coords, left_ellipsoid, right_ellipsoid, rotation_matrix)
+
+  rotation_matrix
 }
-# Example usage:
-# main(parc_path = files[[4]], lut_path = "FreeSurferColorLUT.txt")
+
+main <- function(parc_path, lut_path) {
+  parc <- readNifti(parc_path)
+  rot <- compute_combined_rotation(parc, lut_path)
+  print("Combined rotation matrix (RAS enforced):")
+  print(rot)
+}
+
+# # Load dependencies
+# library(RNifti)
+# library(rgl)
+# library(misc3d)
+# library(Rvcg)
+# library(geometry)
+# library(dplyr)
+# library(stringr)
+# library(pracma)
+
+# Usage
+# Create a 2x1 subplot layout
+# par(mfrow = c(2, 1))
+
+# # # First subject
+# path1 = "sub-expANONYMIZED_ses-2024ANON4295Se4_desc-padded_segmentation.nii.gz"
+# main(parc_path = path1, lut_path = "FreeSurferColorLUT.txt")
+
+# # # Second subject
+# path2 = '/Users/edwardclarkson/git/qaMRI-clone/testData/BIDS4/derivatives/segmentation/sub-control1/ses-2021B/sub-control1_ses-2021B_desc-padded_segmentation.nii.gz'
+# main(parc_path = path2, lut_path = "FreeSurferColorLUT.txt")
+
+# # Reset plot layout
+# par(mfrow = c(1, 1))

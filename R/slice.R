@@ -33,24 +33,18 @@ extract_nonzero_slices <- function(img, center = NULL) {
   )
 }
 
-extract_oriented_slices <- function(img, affine = NULL, center = NULL, spacing = 1.0) {
+
+#' Extract slices in canonical anatomical orientation using the affine matrix
+extract_oriented_slices <- function(img, rotation = NULL, center = NULL, spacing = 1.0) {
   dims <- dim(img)
   if (length(dims) < 3) stop("Image must be at least 3D")
 
   if (is.null(center)) {
     center <- floor(dims[1:3] / 2)
   }
+
   parcellation_extent <- apply(which(img > 0, arr.ind = TRUE), 2, function(x) diff(range(x)))
   slice_size <- ceiling(max(parcellation_extent) * 1.2)
-
-  if (is.null(affine)) {
-    slices <- list(
-      sagittal = img[center[1], , ],
-      coronal  = img[ , center[2], ],
-      axial    = img[ , , center[3]]
-    )
-    return(slices)
-  }
 
   extract_slice_plane <- function(ax1, ax2, center, img, slice_size, spacing) {
     offset <- (slice_size - 1) / 2
@@ -72,17 +66,31 @@ extract_oriented_slices <- function(img, affine = NULL, center = NULL, spacing =
       }
     }
 
-    matrix(values, nrow = slice_size, ncol = slice_size, byrow = TRUE)
+    matrix(values, nrow = slice_size, ncol = slice_size, byrow = TRUE) |> t()
   }
 
-  # Adjusted anatomical planes with corrected direction -- TODO: fix this
-  sagittal <- extract_slice_plane(affine[,3], affine[,2], center, img, slice_size, spacing)  # Z-Y (Sagittal)
-  coronal  <- extract_slice_plane(affine[,1], affine[,3], center, img, slice_size, spacing)  # X-Z (Coronal)
-  axial    <- extract_slice_plane(affine[,1], affine[,2], center, img, slice_size, spacing)  # X-Y (Axial)
+  if (is.null(rotation)) {
+    slices <- list(
+      sagittal = img[center[1], , ],
+      coronal  = img[ , center[2], ],
+      axial    = img[ , , center[3]]
+    )
+    return(slices)
+  }
+
+  if (is.null(rotation)) stop("Rotation matrix must be provided")
+
+  x_axis <- norm_vector(rotation[, 1])
+  y_axis <- norm_vector(rotation[, 2])
+  z_axis <- norm_vector(rotation[, 3])
+
+  axial    <- extract_slice_plane(x_axis, y_axis, center, img, slice_size, spacing)
+  sagittal <- extract_slice_plane(y_axis, z_axis, center, img, slice_size, spacing)
+  coronal  <- extract_slice_plane(x_axis, z_axis, center, img, slice_size, spacing)
 
   list(
-    axial    = t(apply(sagittal, 2, rev))[, ncol(sagittal):1],
+    axial    = axial,
     coronal  = coronal,
-    sagittal = t(apply(axial, 2, rev))[, ncol(axial):1]
+    sagittal = sagittal
   )
 }
